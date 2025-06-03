@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,11 +45,13 @@ public class RagBasicProcessorService {
         return promptTemplate.render(templateMap);
     }
 
-    public String generateRAGResponse(String systemPrompt, String userPrompt, String filenameForCustomContext) {
+    public Mono<String> generateRAGResponse(String systemPrompt, String userPrompt, String filenameForCustomContext) {
         var customContext = retrieveCustomContext(filenameForCustomContext);
         var augmentUserPrompt = augmentUserPrompt(userPrompt, customContext);
 
-        return aiService.generateBasicResponse(systemPrompt, augmentUserPrompt);
+        return Mono.fromCallable(
+                        () -> aiService.generateBasicResponse(systemPrompt, augmentUserPrompt))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     public Flux<String> streamRagResponse(String systemPrompt, String userPrompt, String filenameForCustomContext) {

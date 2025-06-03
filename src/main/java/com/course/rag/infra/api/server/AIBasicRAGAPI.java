@@ -51,9 +51,7 @@ public class AIBasicRAGAPI {
 
     @PostMapping(value="/ask", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<String> basicRAG(@RequestBody @Valid AIRequest request, @RequestParam(value = "filename") @NotBlank String filenameForCustomContext) {
-         var response = ragBasicProcessorService.generateRAGResponse(request.systemPrompt(), request.userPrompt(), filenameForCustomContext);
-
-         return Mono.just(response);
+          return ragBasicProcessorService.generateRAGResponse(request.systemPrompt(), request.userPrompt(), filenameForCustomContext);
     }
 
     @PostMapping(value="/ask/stream", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

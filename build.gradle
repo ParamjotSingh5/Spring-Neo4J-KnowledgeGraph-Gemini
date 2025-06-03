@@ -26,6 +26,7 @@ dependencies {
 	annotationProcessor('org.projectlombok:lombok')
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'org.springframework.ai:spring-ai-neo4j-store-spring-boot-starter:1.0.0-M6'
 	implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M6'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
