@@ -30,8 +30,11 @@ public class AIVectorRAGAPI {
     @PostMapping(value = "/indexing/document/filesystem", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> indexDocument(@RequestBody @Valid VectorIndexingRequestFromFileSystem request) {
         try {
-            var documents = ragVectorIndexingService.indexDocumentFromFileSystem(request.path() , request.keywords());
-            return ResponseEntity.ok("Documents indexed successfully from file system. Chunk size: " + documents.size());
+            ragVectorIndexingService.indexDocumentFromFileSystem(request.path() , request.keywords()).subscribe(
+                    processedDocuments -> System.out.println("Document processing complete! Added " + processedDocuments.size() + " documents."),
+                    error -> System.err.println("Document processing failed: " + error.getMessage())
+            );
+            return ResponseEntity.ok("Documents indexed successfully from file system." );
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error indexing document: " + e.getMessage());
         }
@@ -41,8 +44,11 @@ public class AIVectorRAGAPI {
     @PostMapping(value = "/indexing/document/url", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> indexDocument(@RequestBody @Valid VectorIndexingRequestFromURl request) {
         try {
-            var documents = ragVectorIndexingService.indexDocumentFromURL(request.url() ,  request.keywords());
-            return ResponseEntity.ok("Documents indexed successfully from URL. Chunk size: " + documents.size());
+             ragVectorIndexingService.indexDocumentFromURL(request.url() ,  request.keywords()).subscribe(
+                     processedDocuments -> System.out.println("Document processing complete! Added " + processedDocuments.size() + " documents."),
+                     error -> System.err.println("Document processing failed: " + error.getMessage())
+             );;
+            return ResponseEntity.ok("Documents indexed successfully from URL. Chunk size: ");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error indexing document: " + e.getMessage());
         }

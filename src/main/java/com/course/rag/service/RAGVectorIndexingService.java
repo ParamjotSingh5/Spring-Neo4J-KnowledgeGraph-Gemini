@@ -12,6 +12,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -31,7 +33,7 @@ public class RAGVectorIndexingService {
     private static final String CUSTOM_KEYWORDS_METADATA_KEY = "custom_keywords";
 
 
-    public List<Document> indexDocumentFromURL(String sourcePath, List<String> keywords) {
+    public Mono<List<Document>> indexDocumentFromURL(String sourcePath, List<String> keywords) {
         // Read the document from the URL
         try{
             var resource =  new UrlResource(sourcePath);
@@ -43,14 +45,14 @@ public class RAGVectorIndexingService {
         }
     }
 
-    public List<Document> indexDocumentFromFileSystem(String sourcePath, List<String> keywords) {
+    public Mono<List<Document>> indexDocumentFromFileSystem(String sourcePath, List<String> keywords) {
         // Read the document from the file system
         var resource = new FileSystemResource(sourcePath);
 
         return processDocument(resource, keywords);
     }
 
-    private List<Document> processDocument(Resource resource, List<String> keywords) {
+    private Mono<List<Document>> processDocument(Resource resource, List<String> keywords) {
         Assert.isTrue(resource.exists(), "Resource does not exist");
 
         var parsedDocuments = tikaDocumentReader.readFrom(resource);
@@ -58,11 +60,18 @@ public class RAGVectorIndexingService {
 
         splitDocument.forEach(document -> addCustomMetadata(document, keywords));
 
-        vectorStore.add(splitDocument);
 
-        log.info("Added {} documents", splitDocument.size());
+        return Mono.fromRunnable(() -> {
+                    log.debug("Calling vectorStore.add for {} documents on thread: {}", splitDocument.size(), Thread.currentThread().getName());
+                    vectorStore.add(splitDocument);
+                    log.debug("vectorStore.add completed for {} documents on thread: {}", splitDocument.size(), Thread.currentThread().getName());
+                })
+                .subscribeOn(Schedulers.boundedElastic()) // Ensures the Runnable runs on a dedicated thread
+                .thenReturn(splitDocument) // After the Runnable completes, emit the splitDocument list
+                .cache() // Caches the result of the Mono for subsequent subscriptions
+                .doOnSuccess(splitDocuments -> log.info("Successfully added {} documents", splitDocuments.size()))
+                .doOnError(e -> log.error("Error processing document: {}", e.getMessage(), e));
 
-        return splitDocument;
     }
 
     private void addCustomMetadata(Document document, List<String> keywords) {
