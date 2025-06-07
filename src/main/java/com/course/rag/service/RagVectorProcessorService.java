@@ -39,7 +39,7 @@ public class RagVectorProcessorService {
             var similarDocuments = vectorStore.similaritySearch(
                     SearchRequest.builder().query(userPrompt)
                             .topK(RagVectorProcessorService.TOP_K)
-                            .similarityThreshold(SIMILARITY_THRESHOLD).build()
+                            .similarityThreshold(0.7).build()
             );
 
             var customContext = new StringBuilder();
