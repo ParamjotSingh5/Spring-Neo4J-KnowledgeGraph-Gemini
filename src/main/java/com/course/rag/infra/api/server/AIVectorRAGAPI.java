@@ -5,6 +5,7 @@ import com.course.rag.infra.api.request.*;
 import com.course.rag.service.RAGBasicIndexingService;
 import com.course.rag.service.RAGVectorIndexingService;
 import com.course.rag.service.RagBasicProcessorService;
+import com.course.rag.service.RagVectorProcessorService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -25,7 +26,7 @@ public class AIVectorRAGAPI {
     private RAGVectorIndexingService ragVectorIndexingService;
 
     @Autowired
-    private RagBasicProcessorService ragBasicProcessorService;
+    private RagVectorProcessorService ragVectorProcessorService;
 
     @PostMapping(value = "/indexing/document/filesystem", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> indexDocument(@RequestBody @Valid VectorIndexingRequestFromFileSystem request) {
@@ -54,13 +55,13 @@ public class AIVectorRAGAPI {
         }
     }
 
-    @PostMapping(value="/ask", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<String> basicRAG(@RequestBody @Valid AIRequest request, @RequestParam(value = "filename") @NotBlank String filenameForCustomContext) {
-          return ragBasicProcessorService.generateRAGResponse(request.systemPrompt(), request.userPrompt(), filenameForCustomContext);
+    @PostMapping(value="/ask", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    public Mono<String> basicRAG(@RequestBody @Valid AIRequest request, @RequestParam(name ="top-k", required = false, defaultValue = "0") int topK) {
+          return ragVectorProcessorService.generateRAGResponse(request.systemPrompt(), request.userPrompt());
     }
 
-    @PostMapping(value="/ask/stream", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Flux<String> basicStreamRAG(@RequestBody @Valid AIRequest request, @RequestParam(value = "filename") @NotBlank String filenameForCustomContext) {
-        return ragBasicProcessorService.streamRagResponse(request.systemPrompt(), request.userPrompt(), filenameForCustomContext);
+    @PostMapping(value="/ask/stream", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    public Flux<String> basicStreamRAG(@RequestBody @Valid AIRequest request, @RequestParam(name ="top-k", required = false, defaultValue = "0") int topK) {
+        return ragVectorProcessorService.streamRagResponse(request.systemPrompt(), request.userPrompt());
     }
 }
