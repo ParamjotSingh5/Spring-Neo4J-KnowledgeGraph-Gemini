@@ -3,6 +3,7 @@ package com.course.rag.service;
 import com.course.rag.indexing.RAGDocumentFileWriter;
 import com.course.rag.indexing.RAGTikaDocumentReader;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.autoconfigure.vectorstore.neo4j.Neo4jVectorStoreProperties;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TextSplitter;
 import org.springframework.ai.vectorstore.neo4j.Neo4jVectorStore;
@@ -29,6 +30,9 @@ public class RAGVectorIndexingService {
 
     @Autowired
     private Neo4jVectorStore vectorStore;
+
+    @Autowired
+    Neo4jVectorStoreProperties neo4jVectorStoreProperties;
 
     private static final String CUSTOM_KEYWORDS_METADATA_KEY = "custom_keywords";
 
@@ -63,6 +67,7 @@ public class RAGVectorIndexingService {
 
         return Mono.fromRunnable(() -> {
                     log.debug("Calling vectorStore.add for {} documents on thread: {}", splitDocument.size(), Thread.currentThread().getName());
+                    log.debug("embedding dimension: {}", neo4jVectorStoreProperties.getEmbeddingDimension());
                     vectorStore.add(splitDocument);
                     log.debug("vectorStore.add completed for {} documents on thread: {}", splitDocument.size(), Thread.currentThread().getName());
                 })

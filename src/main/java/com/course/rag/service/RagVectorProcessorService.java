@@ -34,6 +34,9 @@ public class RagVectorProcessorService {
     }
 
     private Mono<String> retrieveCustomContext(String userPrompt){
+
+
+
         return Mono.fromCallable(() -> {
             // This blocking operation will be executed on a dedicated thread
             var similarDocuments = vectorStore.similaritySearch(
