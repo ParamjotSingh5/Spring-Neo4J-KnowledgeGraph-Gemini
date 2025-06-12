@@ -1,5 +1,4 @@
-## Project Title
-A Learning Project for Java Spring AI with Neo4J and OpenAI
+## A Learning Project for Java Spring AI with Neo4J and OpenAI
 
 ### Description
 This project serves as a hands-on practice to reinforce the skills learned in the "Java Spring AI, Neo4J, and OpenAI for Knowledge Graph RAG" course. It focuses on integrating Java Spring with AI capabilities, utilizing Neo4J as a graph database, and leveraging Gemini's tools for intelligent data processing.
