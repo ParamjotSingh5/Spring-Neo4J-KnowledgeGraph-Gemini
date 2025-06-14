@@ -30,6 +30,11 @@ dependencies {
 	implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M6'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+	implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+	implementation 'commons-codec:commons-code:1.17.1'
+
+	runtimeOnly 'org.postgresql:r2dbc-postgresql'
+
 	implementation 'org.springframework.ai:spring-ai-tika-document-reader'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
