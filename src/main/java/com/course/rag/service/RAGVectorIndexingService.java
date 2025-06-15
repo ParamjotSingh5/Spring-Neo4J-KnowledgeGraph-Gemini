@@ -2,7 +2,10 @@ package com.course.rag.service;
 
 import com.course.rag.indexing.RAGDocumentFileWriter;
 import com.course.rag.indexing.RAGTikaDocumentReader;
+import com.course.rag.repository.RAGProcessedVectorDocumentChunksRepository;
+import com.course.rag.repository.RAGProcessedVectorDocumentRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.ai.autoconfigure.vectorstore.neo4j.Neo4jVectorStoreProperties;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TextSplitter;
@@ -33,6 +36,11 @@ public class RAGVectorIndexingService {
 
     @Autowired
     Neo4jVectorStoreProperties neo4jVectorStoreProperties;
+
+    @Autowired
+    private RAGProcessedVectorDocumentRepository ragProcessedVectorDocumentRepository;
+    @Autowired
+    private RAGProcessedVectorDocumentChunksRepository ragProcessedVectorDocumentChunksRepository;
 
     private static final String CUSTOM_KEYWORDS_METADATA_KEY = "custom_keywords";
 
@@ -87,5 +95,19 @@ public class RAGVectorIndexingService {
         Assert.notNull(document, "Document must not be null");
 
         document.getMetadata().put(CUSTOM_KEYWORDS_METADATA_KEY, keywords);
+    }
+
+    private String calculateHash(Resource resource) {
+        var lastModified = 0L;
+
+        try {
+            lastModified = resource.lastModified();
+        } catch (Exception e) {
+            log.error("Error getting last modified time for resource: {}", e.getMessage());
+        }
+
+        var original = resource.getDescription().toLowerCase() + "//" + lastModified;
+
+        return DigestUtils.sha256Hex(original);
     }
 }
