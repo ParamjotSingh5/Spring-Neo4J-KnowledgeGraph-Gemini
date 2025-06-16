@@ -1,5 +1,7 @@
 package com.course.rag.service;
 
+import com.course.rag.entity.RAGProcessedVectorDocument;
+import com.course.rag.entity.RAGProcessedVectorDocumentChunk;
 import com.course.rag.indexing.RAGDocumentFileWriter;
 import com.course.rag.indexing.RAGTikaDocumentReader;
 import com.course.rag.repository.RAGProcessedVectorDocumentChunksRepository;
@@ -16,10 +18,13 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -109,5 +114,63 @@ public class RAGVectorIndexingService {
         var original = resource.getDescription().toLowerCase() + "//" + lastModified;
 
         return DigestUtils.sha256Hex(original);
+    }
+
+    private Mono<List<Document>> processDocumentReactive(Resource resource, List<String> keywords) {
+        Assert.isTrue(resource.exists(), "Resource does not exist");
+
+        var documentFromDB = ragProcessedVectorDocumentRepository.findBySourcePath(resource.getFilename());
+        var now = OffsetDateTime.now();
+
+        return documentFromDB.
+                defaultIfEmpty(
+                        new RAGProcessedVectorDocument(null, resource.getFilename(), "", now, now))
+                .flatMap(existingDocument -> {
+                    var hash = calculateHash(resource);
+
+                    if(existingDocument.getHash().equals(hash)) {
+                        log.info("Document {} already indexed, skipping re-indexing.", resource.getFilename());
+                        return Mono.just(List.of());
+                    }
+
+                    var parsedDocument = tikaDocumentReader.readFrom(resource);
+                    var splitDocuments = textSplitter.split(parsedDocument);
+
+                    splitDocuments.forEach(document ->  addCustomMetadata(document, keywords));
+
+                    vectorStore.add(splitDocuments);
+
+                    log.info("Indexed document {} with {} chunks.", resource.getFilename(), splitDocuments.size());
+
+                    existingDocument.setHash(hash);
+                    existingDocument.setUpdatedAt(now);
+
+                    try{
+                        ragProcessedVectorDocumentChunksRepository
+                                .findByProcessedVectorDocumentId(existingDocument.getId())
+                                .subscribe(chunk  -> {
+                                    ragProcessedVectorDocumentChunksRepository.deleteById(UUID.fromString(chunk.getChunkId()))
+                                            .subscribe();
+                                    vectorStore.delete(List.of(chunk.getChunkId()));
+                                });
+
+                        ragProcessedVectorDocumentRepository.save(existingDocument).subscribe(
+                                savedDocument -> {
+                                    splitDocuments.forEach(chunk -> {
+                                        var chunkEntity = new RAGProcessedVectorDocumentChunk(chunk.getId(),
+                                                savedDocument.getProcessedVectorDocumentId());
+
+                                        ragProcessedVectorDocumentChunksRepository.save(chunkEntity).subscribe();
+                                    });
+                                });
+                    }
+                    catch (Exception e) {
+                        log.error("Failed to save processed document to database", e);
+                        return Mono.empty();
+                    }
+
+
+                    return Mono.just(splitDocuments);
+                });
     }
 }
