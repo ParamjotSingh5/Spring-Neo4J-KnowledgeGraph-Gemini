@@ -15,6 +15,7 @@ java {
 
 repositories {
 	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
 }
 
 ext {
@@ -31,7 +32,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
-	implementation 'commons-codec:commons-code:1.17.1'
+	implementation 'commons-codec:commons-codec:1.17.1'
 
 	runtimeOnly 'org.postgresql:r2dbc-postgresql'
 
