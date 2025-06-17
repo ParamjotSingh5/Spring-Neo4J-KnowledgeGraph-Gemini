@@ -2,12 +2,12 @@ package com.course.rag.service;
 
 import com.course.rag.entity.RAGProcessedVectorDocument;
 import com.course.rag.entity.RAGProcessedVectorDocumentChunk;
-import com.course.rag.indexing.RAGDocumentFileWriter;
 import com.course.rag.indexing.RAGTikaDocumentReader;
 import com.course.rag.repository.RAGProcessedVectorDocumentChunksRepository;
 import com.course.rag.repository.RAGProcessedVectorDocumentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.autoconfigure.vectorstore.neo4j.Neo4jVectorStoreProperties;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TextSplitter;
@@ -18,7 +18,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -43,9 +42,10 @@ public class RAGVectorIndexingService {
     Neo4jVectorStoreProperties neo4jVectorStoreProperties;
 
     @Autowired
-    private RAGProcessedVectorDocumentRepository ragProcessedVectorDocumentRepository;
+    private RAGProcessedVectorDocumentRepository processedVectorDocumentRepository;
+
     @Autowired
-    private RAGProcessedVectorDocumentChunksRepository ragProcessedVectorDocumentChunksRepository;
+    private RAGProcessedVectorDocumentChunksRepository processedVectorDocumentChunkRepository;
 
     private static final String CUSTOM_KEYWORDS_METADATA_KEY = "custom_keywords";
 
@@ -116,61 +116,61 @@ public class RAGVectorIndexingService {
         return DigestUtils.sha256Hex(original);
     }
 
+    @SuppressWarnings("null")
     private Mono<List<Document>> processDocumentReactive(Resource resource, List<String> keywords) {
-        Assert.isTrue(resource.exists(), "Resource does not exist");
+        Assert.isTrue(resource != null && resource.exists(), "Resource must not be null and must exist");
 
-        var documentFromDB = ragProcessedVectorDocumentRepository.findBySourcePath(resource.getFilename());
+        var existingFromDb = processedVectorDocumentRepository.findBySourcePath(resource.getDescription());
         var now = OffsetDateTime.now();
 
-        return documentFromDB.
-                defaultIfEmpty(
-                        new RAGProcessedVectorDocument(null, resource.getFilename(), "", now, now))
-                .flatMap(existingDocument -> {
+        return existingFromDb
+                .defaultIfEmpty(
+                        new RAGProcessedVectorDocument(null, resource.getDescription(), StringUtils.EMPTY, now, now))
+                .flatMap(element -> {
                     var hash = calculateHash(resource);
 
-                    if(existingDocument.getHash().equals(hash)) {
-                        log.info("Document {} already indexed, skipping re-indexing.", resource.getFilename());
-                        return Mono.just(List.of());
+                    if (StringUtils.equals(element.getHash(), hash)) {
+                        log.info("Document with hash {} already indexed", hash);
+
+                        return Mono.empty();
                     }
 
-                    var parsedDocument = tikaDocumentReader.readFrom(resource);
-                    var splitDocuments = textSplitter.split(parsedDocument);
+                    var parsedDocuments = tikaDocumentReader.readFrom(resource);
+                    var splittedDocuments = textSplitter.split(parsedDocuments);
 
-                    splitDocuments.forEach(document ->  addCustomMetadata(document, keywords));
+                    splittedDocuments.forEach(document -> addCustomMetadata(document, keywords));
 
-                    vectorStore.add(splitDocuments);
+                    vectorStore.add(splittedDocuments);
 
-                    log.info("Indexed document {} with {} chunks.", resource.getFilename(), splitDocuments.size());
+                    log.info("Original document splitted into {} chunks and saved to vector store",
+                            splittedDocuments.size());
 
-                    existingDocument.setHash(hash);
-                    existingDocument.setUpdatedAt(now);
+                    element.setHash(hash);
+                    element.setUpdatedAt(now);
 
-                    try{
-                        ragProcessedVectorDocumentChunksRepository
-                                .findByProcessedVectorDocumentId(existingDocument.getId())
-                                .subscribe(chunk  -> {
-                                    ragProcessedVectorDocumentChunksRepository.deleteById(UUID.fromString(chunk.getChunkId()))
-                                            .subscribe();
+                    try {
+                        processedVectorDocumentChunkRepository
+                                .findByProcessedVectorDocumentId(element.getProcessedVectorDocumentId())
+                                .subscribe(chunk -> {
+                                    processedVectorDocumentChunkRepository.deleteById(chunk.getProcessedVectorDocumentId()).subscribe();
                                     vectorStore.delete(List.of(chunk.getChunkId()));
                                 });
 
-                        ragProcessedVectorDocumentRepository.save(existingDocument).subscribe(
+                        processedVectorDocumentRepository.save(element).subscribe(
                                 savedDocument -> {
-                                    splitDocuments.forEach(chunk -> {
+                                    splittedDocuments.forEach(chunk -> {
                                         var chunkEntity = new RAGProcessedVectorDocumentChunk(chunk.getId(),
                                                 savedDocument.getProcessedVectorDocumentId());
 
-                                        ragProcessedVectorDocumentChunksRepository.save(chunkEntity).subscribe();
+                                        processedVectorDocumentChunkRepository.save(chunkEntity).subscribe();
                                     });
                                 });
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         log.error("Failed to save processed document to database", e);
                         return Mono.empty();
                     }
 
-
-                    return Mono.just(splitDocuments);
+                    return Mono.just(splittedDocuments);
                 });
     }
 }
