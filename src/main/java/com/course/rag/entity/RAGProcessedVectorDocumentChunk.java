@@ -20,7 +20,7 @@ public class RAGProcessedVectorDocumentChunk implements Persistable<String > {
 
     @Id
     private String chunkId;
-    private UUID processedVectorDocumentId;
+    private UUID processedDocumentId;
 
     @Override
     @Nullable

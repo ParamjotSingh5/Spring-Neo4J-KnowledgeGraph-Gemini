@@ -5,47 +5,59 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Table;
+import org.springframework.lang.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-@Table("rag_processed_vector_documents")
-@Getter
 @Setter
+@Getter
+@Table("rag_processed_vector_documents")
 public class RAGProcessedVectorDocument implements Persistable<UUID> {
+
     @Id
-    private UUID processedVectorDocumentId;
+    private UUID processedDocumentId;
 
     private String sourcePath;
 
     private String hash;
 
-    private OffsetDateTime createdAt;
-    private OffsetDateTime updatedAt;
+    private OffsetDateTime firstProcessedAt;
 
-    public RAGProcessedVectorDocument(UUID processedVectorDocumentId, String sourcePath, String hash, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
-        this.processedVectorDocumentId = processedVectorDocumentId;
-        this.sourcePath = sourcePath;
-        this.hash = hash;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
+    private OffsetDateTime lastProcessedAt;
 
     public RAGProcessedVectorDocument() {
+
     }
 
+    public RAGProcessedVectorDocument(UUID processedDocumentId, String sourcePath, String hash,
+                                      OffsetDateTime firstProcessedAt, OffsetDateTime lastProcessedAt) {
+        this.processedDocumentId = processedDocumentId;
+        this.sourcePath = sourcePath;
+        this.hash = hash;
+        this.firstProcessedAt = firstProcessedAt;
+        this.lastProcessedAt = lastProcessedAt;
+    }
 
     @Override
+    public String toString() {
+        return "RAGProcessedVectorDocument [processedDocumentId=" + processedDocumentId + ", sourcePath=" + sourcePath
+                + ", hash=" + hash + ", firstProcessedAt=" + firstProcessedAt + ", lastProcessedAt=" + lastProcessedAt
+                + "]";
+    }
+
+    @Override
+    @Nullable
     public UUID getId() {
-        if(this.processedVectorDocumentId == null){
-            this.processedVectorDocumentId = UUID.randomUUID();
+        if (this.processedDocumentId == null) {
+            this.processedDocumentId = UUID.randomUUID();
         }
 
-        return this.processedVectorDocumentId;
+        return this.processedDocumentId;
     }
 
     @Override
     public boolean isNew() {
-        return false;
+        return this.processedDocumentId == null;
     }
 }

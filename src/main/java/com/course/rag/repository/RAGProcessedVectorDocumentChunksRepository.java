@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface RAGProcessedVectorDocumentChunksRepository extends R2dbcRepository<RAGProcessedVectorDocumentChunk, UUID> {
 
-    Flux<RAGProcessedVectorDocumentChunk> findByProcessedVectorDocumentId(UUID processedVectorDocumentId);
+    Flux<RAGProcessedVectorDocumentChunk> findByProcessedDocumentId(UUID processedDocumentId);
 }

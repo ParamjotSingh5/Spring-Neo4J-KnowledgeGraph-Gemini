@@ -21,9 +21,10 @@ import org.springframework.util.Assert;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -92,6 +93,21 @@ public class RAGVectorIndexingService {
 
     }
 
+    private Mono<List<Document>> processDocument(List<Document> splitDocument, List<String> keywords) {
+
+        splitDocument.forEach(document -> addCustomMetadata(document, keywords));
+
+        return Mono.fromRunnable(() -> {
+                    vectorStore.add(splitDocument);
+                })
+                .subscribeOn(Schedulers.boundedElastic()) // Ensures the Runnable runs on a dedicated thread
+                .thenReturn(splitDocument) // After the Runnable completes, emit the splitDocument list
+                .cache() // Caches the result of the Mono for subsequent subscriptions
+                .doOnSuccess(splitDocuments -> log.info("Successfully added {} documents", splitDocuments.size()))
+                .doOnError(e -> log.error("Error processing document: {}", e.getMessage(), e));
+
+    }
+
     private void addCustomMetadata(Document document, List<String> keywords) {
         if (keywords == null || keywords.isEmpty()) {
             return;
@@ -138,21 +154,21 @@ public class RAGVectorIndexingService {
                     var parsedDocuments = tikaDocumentReader.readFrom(resource);
                     var splittedDocuments = textSplitter.split(parsedDocuments);
 
-                    splittedDocuments.forEach(document -> addCustomMetadata(document, keywords));
-
-                    vectorStore.add(splittedDocuments);
-
-                    log.info("Original document splitted into {} chunks and saved to vector store",
-                            splittedDocuments.size());
+                    processDocument(splittedDocuments, keywords)
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .doOnSuccess(docs -> log.info("Successfully processed {} documents", docs.size()))
+                            .doOnError(e -> log.error("Error processing document: {}", e.getMessage(), e))
+                                    .flatMap(document -> Mono.fromRunnable(() -> {log.info("Original document splitted into {} chunks and saved to vector store",
+                                            splittedDocuments.size());}));
 
                     element.setHash(hash);
-                    element.setUpdatedAt(now);
+                    element.setLastProcessedAt(now);
 
                     try {
                         processedVectorDocumentChunkRepository
-                                .findByProcessedVectorDocumentId(element.getProcessedVectorDocumentId())
+                                .findByProcessedDocumentId(element.getProcessedDocumentId())
                                 .subscribe(chunk -> {
-                                    processedVectorDocumentChunkRepository.deleteById(chunk.getProcessedVectorDocumentId()).subscribe();
+                                    processedVectorDocumentChunkRepository.deleteById(chunk.getProcessedDocumentId()).subscribe();
                                     vectorStore.delete(List.of(chunk.getChunkId()));
                                 });
 
@@ -160,7 +176,7 @@ public class RAGVectorIndexingService {
                                 savedDocument -> {
                                     splittedDocuments.forEach(chunk -> {
                                         var chunkEntity = new RAGProcessedVectorDocumentChunk(chunk.getId(),
-                                                savedDocument.getProcessedVectorDocumentId());
+                                                savedDocument.getProcessedDocumentId());
 
                                         processedVectorDocumentChunkRepository.save(chunkEntity).subscribe();
                                     });
@@ -172,5 +188,22 @@ public class RAGVectorIndexingService {
 
                     return Mono.just(splittedDocuments);
                 });
+    }
+
+    public Mono<List<Document>> indexDocumentFromFilesystemReactive(String sourcePath, List<String> keywords)
+            throws IOException {
+        var resource = new FileSystemResource(sourcePath);
+
+        return processDocumentReactive(resource, keywords);
+    }
+
+    public Mono<List<Document>> indexDocumentFromURLReactive(String url, List<String> keywords) throws IOException {
+        try {
+            var resource = new UrlResource(url);
+
+            return processDocumentReactive(resource, keywords);
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException(String.format("Invalid URL: %s", url), e);
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.course.rag.infra.api.server;
 
 
 import com.course.rag.infra.api.request.*;
+import com.course.rag.infra.api.response.BasicIndexingResponse;
 import com.course.rag.service.RAGBasicIndexingService;
 import com.course.rag.service.RAGVectorIndexingService;
 import com.course.rag.service.RagBasicProcessorService;
@@ -16,6 +17,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/ai/rag/vector")
@@ -63,5 +65,37 @@ public class AIVectorRAGAPI {
     @PostMapping(value="/ask/stream", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     public Flux<String> basicStreamRAG(@RequestBody @Valid AIRequest request, @RequestParam(name ="top-k", required = false, defaultValue = "0") int topK) {
         return ragVectorProcessorService.streamRagResponse(request.systemPrompt(), request.userPrompt());
+    }
+
+    @PostMapping(path = "/indexing/document/filesystem/reactive", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<BasicIndexingResponse>> indexDocumentFromFilesystemReactive(
+            @RequestBody @Valid VectorIndexingRequestFromFileSystem request) throws IOException {
+        var indexedDocuments = ragVectorIndexingService.indexDocumentFromFilesystemReactive(
+                request.path(),
+                request.keywords());
+
+        return indexedDocuments.map(splittedDocuments -> ResponseEntity.ok(
+                        new BasicIndexingResponse(true,
+                                "Document successfully indexed as " + splittedDocuments.size()
+                                        + " chunks")))
+                .defaultIfEmpty(
+                        ResponseEntity.ok(new BasicIndexingResponse(false,
+                                "Document indexing failed")));
+    }
+
+    @PostMapping(path = "/indexing/document/url/reactive", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<BasicIndexingResponse>> indexDocumentFromURLReactive(
+            @RequestBody @Valid VectorIndexingRequestFromURl request) throws IOException {
+        var indexedDocuments = ragVectorIndexingService.indexDocumentFromURLReactive(
+                request.url(),
+                request.keywords());
+
+        return indexedDocuments.map(splittedDocuments -> ResponseEntity.ok(
+                        new BasicIndexingResponse(true,
+                                "Document successfully indexed as " + splittedDocuments.size()
+                                        + " chunks")))
+                .defaultIfEmpty(
+                        ResponseEntity.ok(new BasicIndexingResponse(false,
+                                "Document indexing failed")));
     }
 }
